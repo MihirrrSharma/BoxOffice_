@@ -1,8 +1,33 @@
 *{
   margin: 0;
   padding: 0;
+  box-sizing: border-box;
 }
 
 html, body, #root, .App {
   min-height: 100%;
+  font-family: "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  background-color: #000;
+  color: white;
+}
+
+body.dark {
+  background-color: #000;
+  color: white;
+}
+
+body.light {
+  background-color: #f5f5f5;
+  color: #111;
+}
+
+body.light .App {
+  background-color: #f5f5f5;
+  color: #111;
 }

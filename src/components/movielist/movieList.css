@@ -1,14 +1,22 @@
 .movie__list {
-    padding: 0 3rem 3rem 3rem;
+    padding: 2rem 3rem;
 }
 
 .list__title {
-font-size: 1.75rem;
-margin:  2.5rem;
+    font-size: 2rem;
+    margin-bottom: 1.5rem;
 }
 
+/* 🔥 FIX GRID BACK (LIKE BEFORE BUT CLEANER) */
 .list__cards {
-    display: flex;
-    flex-wrap: wrap ;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+@media (max-width: 768px) {
+  .list__cards {
+    padding: 0 10px;
+    gap: 10px;
+  }
 }

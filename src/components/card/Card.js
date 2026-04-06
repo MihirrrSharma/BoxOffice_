@@ -1,40 +1,66 @@
-import React, {useEffect, useState} from "react"
-import  Skeleton, { SkeletonTheme } from "react-loading-skeleton"
-import "./Card.css"
-import { Link } from "react-router-dom"
+import React, { useRef } from "react"; // ✅ FIX
+import "./Card.css";
+import { Link } from "react-router-dom";
+import { fetchMovieDetail } from "../../constants";
+import {
+  getCachedMovie,
+  setCachedMovie,
+  getPendingRequest,
+  setPendingRequest,
+  clearPendingRequest
+} from "../../utils/cache";
 
-const Cards = ({movie}) => {
-    const [isLoading, setIsLoading] = useState(true)
+const Cards = ({ movie }) => {
 
-    useEffect(() => {
-        setTimeout(() => {
-            setIsLoading(false)
-        }, 1500)
-    }, [])
-    return <>{
-        isLoading
-        ?
-        <div className="cards">
-            <SkeletonTheme color="#202020" highlightColor="#444">
-                <Skeleton height={300} duration={2} />
-            </SkeletonTheme>
+  const hoverTimeout = useRef(null); // ✅ FIX
+
+  const handleHover = () => {
+    hoverTimeout.current = setTimeout(async () => {
+      try {
+        if (getCachedMovie(movie.id)) return;
+        if (getPendingRequest(movie.id)) return;
+
+        const promise = fetchMovieDetail(movie.id);
+        setPendingRequest(movie.id, promise);
+
+        const res = await promise;
+
+        setCachedMovie(movie.id, res);
+        clearPendingRequest(movie.id);
+
+      } catch (e) {
+        clearPendingRequest(movie.id);
+        console.log("Prefetch error", e);
+      }
+    }, 300);
+  };
+
+  const handleLeave = () => {
+    clearTimeout(hoverTimeout.current); // ✅ avoid unnecessary calls
+  };
+
+  return (
+    <Link to={`/movie/${movie.id}`} className="cards__link">
+      <div
+        className="cards"
+        onMouseEnter={handleHover}
+        onMouseLeave={handleLeave} // ✅ ADD THIS
+      >
+        <img
+          className="cards__img"
+          src={movie.poster}
+          alt={movie.title}
+          onError={(e) => {
+            e.target.src = "https://dummyimage.com/300x450/000/fff&text=No+Image";
+          }}
+        />
+
+        <div className="cards__overlay">
+          <div className="card__title">{movie.title}</div>
         </div>
-        :
-        <Link to={`/movie/${movie.id}`} style={{textDecoration: "none",color: "white"}}>
-            <div className="cards">
-                <img className="cards__img" src={`https://image.tmdb.org/t/p/original${movie?movie.poster_path:""}`} alt="card"/>
-                <div className="cards__overlay">
-                    <div className="card__title">{movie?movie.original_title:""}</div>
-                    <div className="card__runtime">
-                         {movie?movie.release_date:""}
-                         <span className="card__rating">{movie ? movie.vote_average:""}<i className="fas fa-star"/></span>
-                    </div>
-                    <div className="card__description">{movie ? movie.overview.slice(0,118)+"...": ""}</div>
-                </div>
-            </div>
-        </Link>
-    }
-    </>
-}
+      </div>
+    </Link>
+  );
+};
 
-export default Cards
+export default Cards;

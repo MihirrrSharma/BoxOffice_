@@ -1,40 +1,66 @@
-import React, { useEffect, useState } from "react"
-import "./movieList.css"
-import { useParams } from "react-router-dom"
-import Cards from "../card/Card"
-
+import React from "react";
+import "./movieList.css";
+import { useParams, useLocation } from "react-router-dom";
+import { useQuery } from '@tanstack/react-query';
+import Cards from "../card/Card";
+import SkeletonCard from "../skeleton/SkeletonCard";
+import { fetchMovies } from "../../constants";
 
 const MovieList = () => {
-  
-        const [movieList, setMovieList] = useState([])
-        const {type} = useParams()
+  const { type } = useParams(); // ✅ correct place
+  const location = useLocation();
 
-        useEffect(() => {
-            getData()
-        }, [])
+  // 🔥 get search query properly
+  const searchQuery = new URLSearchParams(location.search).get("q");
+  const category = type === "search" ? searchQuery : type || "popular";
 
-        useEffect(() =>{
-            getData()
-        }, [type])
+  const { data: response, isLoading } = useQuery({
+    queryKey: ["movieList", category],
+    queryFn: async () => await fetchMovies(type === "search" ? searchQuery : type),
+    enabled: type !== "search" ? true : !!searchQuery,
+    staleTime: type === "search" ? 1000 * 60 * 2 : 1000 * 60 * 12,
+    keepPreviousData: true,
+  });
 
-        const getData = () => {
-            fetch(`https://api.themoviedb.org/3/movie/${type ? type : "popular"}?api_key=4e44d9029b1270a757cddc766a1bcb63&language=en-US`)
-           .then(res => res.json())
-           .then(data => setMovieList(data.results))   
-        }
+  const movieList = response
+    ? response.source === "tmdb"
+      ? response.data.map((m) => ({
+          id: m.id,
+          title: m.title,
+          poster:
+            m.Poster !== "N/A"
+              ? m.Poster
+              : "https://dummyimage.com/300x450/000/fff&text=No+Image",
+          rating: m.vote_average,
+        }))
+      : response.data.map((m) => ({
+          id: m.imdbID,
+          title: m.Title,
+          poster:
+            m.Poster !== "N/A"
+              ? m.Poster
+              : "https://dummyimage.com/300x450/000/fff&text=No+Image",
+          rating: m.imdbRating,
+        }))
+    : [];
 
-        return (
-            <div className="movie__list">
-                <h2 className="list__title">{(type ? type:"POPULAR").toUpperCase()}</h2>
-                <div className="list__cards">
-                    {
-                        movieList.map(movie =>(
-                            <Cards movie={movie} />
-                        ))
-                    }
-                </div>
-            </div>
-        )
-}
+  return (
+    <div className="movie__list">
+      <h2 className="list__title">
+        {(type || "popular")
+          .replace("_", " ")
+          .replace(/\b\w/g, (c) => c.toUpperCase())}
+      </h2>
 
-export default MovieList
+      <div className="list__cards">
+        {isLoading || movieList.length === 0
+          ? Array(10).fill().map((_, i) => <SkeletonCard key={i} />)
+          : movieList.map((movie) => (
+              <Cards key={movie.id} movie={movie} />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export default MovieList;
