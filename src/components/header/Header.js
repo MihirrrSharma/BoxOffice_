@@ -60,7 +60,7 @@ const Header = () => {
     queryFn: async () => {
       if (!debouncedQuery) return [];
       const res = await axios.get(
-        `http://${process.env.REACT_APP_API_URL}/api/movies?q=${debouncedQuery}`
+        `${process.env.REACT_APP_API_URL}/api/movies?q=${debouncedQuery}`
       );
       return res.data.data.slice(0, 6);
     },
@@ -74,7 +74,7 @@ const Header = () => {
     queryKey: ["trendingMovies"],
     queryFn: async () => {
       const res = await axios.get(
-        "http://${process.env.REACT_APP_API_URL}/api/movies?type=popular"
+        "${process.env.REACT_APP_API_URL}/api/movies?type=popular"
       );
       return res.data.data.slice(0, 6);
     },
@@ -85,7 +85,7 @@ const Header = () => {
     queryClient.prefetchQuery(
       ["movieList", type],
       async () => {
-        const res = await axios.get(`http://${process.env.REACT_APP_API_URL}/api/movies?type=${type}`);
+        const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/movies?type=${type}`);
         return res.data;
       },
       {

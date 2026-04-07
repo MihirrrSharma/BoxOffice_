@@ -6,7 +6,11 @@ import dotenv from "dotenv";
 dotenv.config();
 const app = express();
 app.use(cors({
-  origin: "*",
+  origin: [
+    "http://localhost:3000",
+    "https://your-vercel-app.vercel.app"
+  ],
+  credentials: true
 }));
 
 const PORT = process.env.PORT || 5000;
@@ -218,5 +222,5 @@ app.get("/api/movie/:id", async (req, res) => {
 
 // start server
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://${process.env.REACT_APP_API_URL}:${PORT}`);
+  console.log(`🚀 Server running on ${process.env.REACT_APP_API_URL}:${PORT}`);
 });
