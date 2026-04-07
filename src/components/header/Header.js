@@ -74,7 +74,7 @@ const Header = () => {
     queryKey: ["trendingMovies"],
     queryFn: async () => {
       const res = await axios.get(
-        "${process.env.REACT_APP_API_URL}/api/movies?type=popular"
+        `${process.env.REACT_APP_API_URL}/api/movies?type=popular`
       );
       return res.data.data.slice(0, 6);
     },
