@@ -512,6 +512,13 @@ body.light .themeToggle input:checked + .toggleLabel .ball {
   transform: translateY(-50%);
 }
 
+.noResults {
+  padding: 12px 16px;
+  color: #aaa;
+  font-size: 14px;
+  text-align: center;
+}
+
 /* ================= MOBILE ================= */
 @media (max-width: 768px) {
 

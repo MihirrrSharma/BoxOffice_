@@ -3,6 +3,9 @@ import "./Header.css";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { Link, useNavigate, NavLink } from "react-router-dom";
+import { useTheme } from "../../context/ThemeContext";
+import { trackUserActivity } from "../../constants";
+
 
 const Header = () => {
   const [query, setQuery] = useState("");
@@ -13,15 +16,7 @@ const Header = () => {
   const selectionRef = useRef(false);
   const navTimerRef = useRef(null);
   const selectionFreezeRef = useRef(null);
-  const getInitialTheme = () => {
-    const storedTheme = localStorage.getItem("theme");
-    if (storedTheme === "light") return true;
-    if (storedTheme === "dark") return false;
-    return document.body.classList.contains("light");
-  };
-
-  const [isLight, setIsLight] = useState(getInitialTheme);
-
+  const { isLight, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const wrapperRef = useRef(null);
@@ -29,7 +24,13 @@ const Header = () => {
   // debounce API query
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setDebouncedQuery(query.trim());
+      const trimmed = query.trim();
+      setDebouncedQuery(trimmed);
+
+      // track search activity (with debounce + trim)
+      if (trimmed.length > 2) {
+        trackUserActivity({ search: trimmed });
+      }
     }, 300);
 
     return () => window.clearTimeout(timer);
@@ -42,21 +43,9 @@ const Header = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // debounce navigation
-  useEffect(() => {
-    clearTimeout(navTimerRef.current);
-    navTimerRef.current = window.setTimeout(() => {
-      if (query.trim() && !selectionRef.current) {
-        navigate(`/movies/search?q=${query}`);
-      }
-      selectionRef.current = false;
-    }, 500);
-    return () => clearTimeout(navTimerRef.current);
-  }, [query, navigate]);
-
   // fetch search suggestions with React Query
   const { data: searchResults = [] } = useQuery({
-    queryKey: ["searchMovies", debouncedQuery],
+    queryKey: ["movieList", debouncedQuery], // ✅ changed
     queryFn: async () => {
       if (!debouncedQuery) return [];
       const res = await axios.get(
@@ -65,7 +54,7 @@ const Header = () => {
       return res.data.data.slice(0, 6);
     },
     enabled: !!debouncedQuery,
-    staleTime: 1000 * 60 * 2, // 1-2 minutes for search
+    staleTime: 1000 * 60 * 2,
     keepPreviousData: true,
   });
 
@@ -106,12 +95,6 @@ const Header = () => {
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    document.body.classList.toggle("light", isLight);
-    document.body.classList.toggle("dark", !isLight);
-    localStorage.setItem("theme", isLight ? "light" : "dark");
-  }, [isLight]);
-
   const toggleMenu = () => setMenuOpen((prev) => !prev);
   const closeMenu = () => setMenuOpen(false);
 
@@ -130,11 +113,6 @@ const Header = () => {
     selectionFreezeRef.current = window.setTimeout(() => {
       selectionRef.current = false;
     }, 1000);
-  };
-
-  // theme toggle
-  const toggleTheme = () => {
-    setIsLight((prev) => !prev);
   };
 
   return (
@@ -212,6 +190,11 @@ const Header = () => {
                 setShowDropdown(true);
               }}
               onFocus={() => setShowDropdown(true)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault(); // 🚫 block navigation
+                }
+              }}
             />
 
             {query && (
@@ -228,8 +211,12 @@ const Header = () => {
           </div>
 
           {showDropdown &&
-            (searchResults.length > 0 || trendingMovies.length > 0) && (
+            (query || trendingMovies.length > 0) && (
               <div className="searchDropdown">
+                {query && searchResults.length === 0 && (
+                  <div className="noResults">No results found</div>
+                )}
+
                 {!query && <p className="dropdownTitle">🔥 Trending</p>}
 
                 {(query ? searchResults : trendingMovies).map((m) => {

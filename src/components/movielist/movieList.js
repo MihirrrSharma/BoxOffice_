@@ -1,10 +1,10 @@
-import React from "react";
+import React, { useEffect } from "react";
 import "./movieList.css";
 import { useParams, useLocation } from "react-router-dom";
 import { useQuery } from '@tanstack/react-query';
 import Cards from "../card/Card";
 import SkeletonCard from "../skeleton/SkeletonCard";
-import { fetchMovies } from "../../constants";
+import { fetchMovies, trackUserActivity } from "../../constants";
 
 const MovieList = () => {
   const { type } = useParams(); // ✅ correct place
@@ -12,6 +12,13 @@ const MovieList = () => {
 
   // 🔥 get search query properly
   const searchQuery = new URLSearchParams(location.search).get("q");
+  
+  useEffect(() => {
+    if (type === "search" && searchQuery) {
+      trackUserActivity({ search: searchQuery });
+    }
+  }, [searchQuery, type]);
+
   const category = type === "search" ? searchQuery : type || "popular";
 
   const { data: response, isLoading } = useQuery({

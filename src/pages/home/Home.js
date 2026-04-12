@@ -5,6 +5,7 @@ import { Carousel } from "react-responsive-carousel";
 import { Link } from "react-router-dom";
 import MovieList from "../../components/movielist/movieList";
 import { fetchMovies } from "../../constants";
+import ForYou from "../../components/forYou/ForYou";
 
 const Home = () => {
   const [popularMovies, setPopularMovies] = useState([]);
@@ -12,7 +13,7 @@ const Home = () => {
   useEffect(() => {
     const getData = async () => {
       try {
-        const response = await fetchMovies();
+        const response = await fetchMovies("Mission Impossible"); // fallback for trending movies
 
         const movies =
           response.source === "tmdb"
@@ -54,6 +55,7 @@ const Home = () => {
         ))}
       </Carousel>
 
+      <ForYou />
       <MovieList />
     </div>
   );
