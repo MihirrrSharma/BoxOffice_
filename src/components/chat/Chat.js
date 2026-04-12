@@ -2,14 +2,12 @@ import { useState } from "react";
 import { fetchAIResponse } from "../../constants";
 import { useNavigate } from "react-router-dom";
 import { useRef, useEffect } from "react";
-import { useTheme } from "../../context/ThemeContext";
 import { trackUserActivity } from "../../constants";
 import "./Chat.css";
 
 const Chat = ({ currentMovie }) => {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([]);
-  const { isLight } = useTheme();
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
