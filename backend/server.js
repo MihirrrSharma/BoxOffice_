@@ -292,7 +292,9 @@ app.post("/api/ai/chat", async (req, res) => {
     // 🎯 RECOMMEND / GENRE / CONFIRM
     // ============================
     if (["recommend", "genre", "confirm"].includes(intent)) {
-      const finalQuery = `${meaningfulQuery || message} ${preferenceSeed}`.trim();
+      const baseQuery = message.trim().length < 4 ? meaningfulQuery : message;
+
+      const finalQuery = `${baseQuery} ${preferenceSeed}`.trim();
 
       const response = await axios.get(
         `${BASE_URL}/api/movies?q=${finalQuery}`
