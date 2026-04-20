@@ -13,7 +13,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:3000",
-      "https://box-office-z18g-xr0j-qv88ebu3w-mihirrrsharmas-projects.vercel.app"
+      "https://box-office-z18g-xr0j-6al8o2k8p-mihirrrsharmas-projects.vercel.app/"
     ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
