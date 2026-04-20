@@ -31,42 +31,55 @@ const Chat = ({ currentMovie }) => {
     }
   }, [messages]);
 
-  const sendMessage = async () => {
-    if (!input.trim()) return;
+const sendMessage = async () => {
+  if (!input.trim()) return;
 
-    const currentInput = input; // store before clearing
+  const currentInput = input;
 
-    // track search activity (with debounce + trim)
-    if (currentInput.trim().length > 3) {
-      trackUserActivity({ search: currentInput });
-    }
-    setInput(""); // clear immediately (UX fix)
+  // track search 
+  if (currentInput.trim().length > 3) {
+    trackUserActivity({ search: currentInput });
+  }
 
-    const userMsg = { role: "user", text: currentInput };
-    setMessages((prev) => [...prev, userMsg]);
+  // build updated messages
+  const updatedMessages = [
+    ...messages,
+    { role: "user", text: currentInput }
+  ];
 
-    try {
-      setLoading(true);
-      const res = await fetchAIResponse(currentInput, {
-        currentMovie: currentMovie?.title,
-      });
+  setMessages(updatedMessages);
+  setInput("");
 
-      setLoading(false);
-      const botMsg = {
-        role: "bot",
-        data: res.data,
-        text: res.text,
-      };
-      setMessages((prev) => [...prev, botMsg]);
-    } catch (err) {
-      console.log(err);
-      setMessages((prev) => [
-        ...prev,
-        { role: "bot", text: "Something went wrong. Try again." },
-      ]);
-      setLoading(false); // reset loading state on error
-    }
-  };
+  try {
+    setLoading(true);
+
+    const res = await fetchAIResponse(currentInput, {
+      currentMovie: currentMovie?.title,
+      history: updatedMessages.slice(-10),
+      userId: localStorage.getItem("userId"),
+    });
+
+    setLoading(false);
+
+    const botMsg = {
+      role: "bot",
+      data: res.data,
+      text: res.text,
+    };
+
+    setMessages((prev) => [...prev, botMsg]);
+
+  } catch (err) {
+    console.log(err);
+
+    setMessages((prev) => [
+      ...prev,
+      { role: "bot", text: "Something went wrong. Try again." },
+    ]);
+
+    setLoading(false);
+  }
+};
 
   return (
     <>

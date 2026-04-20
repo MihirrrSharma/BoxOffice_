@@ -14,7 +14,7 @@ export const fetchMovieDetail = async (id) => {
 export const fetchAIResponse = async (message, context = {}) => {
   const res = await axios.post(
     `${process.env.REACT_APP_API_URL}/api/ai/chat`,
-    { message, context }
+    { message, ...context }
   );
   return res.data;
 };

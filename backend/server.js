@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import OpenAI from "openai";
 import mongoose from "mongoose";
 import UserActivity from "./models/UserActivity.js";
+const detectIntent = require("./utils/intent");
 
 dotenv.config();
 const app = express();
@@ -54,37 +55,6 @@ const omdbRequest = async (params) => {
     },
     timeout: 3000,
   });
-};
-
-const detectIntent = (message) => {
-  const msg = message.toLowerCase();
-
-  if (["hi", "hello", "hey", "yo", "sup"].some((w) => msg === w)) {
-    return "greeting";
-  }
-
-  if (
-    [
-      "suggest",
-      "recommend",
-      "good",
-      "best",
-      "watch",
-      "movies",
-      "shows",
-      "series",
-      "like",
-      "similar",
-      "of",
-      "featuring",
-      "starring",
-      "with",
-    ].some((w) => msg.includes(w))
-  ) {
-    return "recommendation";
-  }
-
-  return "chat";
 };
 
 // get movies (with optional search or category)
@@ -270,29 +240,135 @@ app.get("/api/movie/:id", async (req, res) => {
 
 app.post("/api/ai/chat", async (req, res) => {
   try {
-    const { message, context } = req.body;
+    const { message, history = [], userId } = req.body;
+
     const cleanMsg = message.trim().toLowerCase();
     const intent = detectIntent(cleanMsg);
 
+    // ============================
+    // 🧠 CONTEXT EXTRACTION
+    // ============================
+    const meaningfulQuery = [...history]
+      .reverse()
+      .find(
+        (m) =>
+          m.role === "user" &&
+          m.text.length > 3 &&
+          !["yes", "yeah", "ok", "more"].includes(m.text.toLowerCase())
+      )?.text;
+
+    // ============================
+    // 🔥 PERSONALIZATION
+    // ============================
+    let preferenceSeed = "";
+
+    if (userId) {
+      const activities = await UserActivity.find({ userId });
+
+      const searches = activities.flatMap((a) => a.searches || []);
+      const viewed = activities.flatMap((a) => a.viewedMovies || []);
+
+      preferenceSeed = [
+        ...searches.slice(-3),
+        ...viewed.map((m) => m.title).slice(-3),
+      ].join(" ");
+    }
+
+    console.log("Intent:", intent);
+    console.log("Context:", meaningfulQuery);
+    console.log("Preference:", preferenceSeed);
+
+    // ============================
+    // 👋 GREETING
+    // ============================
     if (intent === "greeting") {
       return res.json({
         data: [],
-        text: "Hey! 👋 What kind of movies/shows are you looking for?"
+        text: "Hey! 👋 What kind of movies/shows are you looking for?",
       });
     }
 
+    // ============================
+    // 🎯 RECOMMEND / GENRE / CONFIRM
+    // ============================
+    if (["recommend", "genre", "confirm"].includes(intent)) {
+      const finalQuery = `${meaningfulQuery || message} ${preferenceSeed}`.trim();
+
+      const response = await axios.get(
+        `${BASE_URL}/api/movies?q=${finalQuery}`
+      );
+
+      const results = response.data.data || [];
+
+      const enrichedMovies = await Promise.all(
+        results.slice(0, 5).map(async (movie) => {
+          return {
+            title: movie.title || movie.Title,
+            reason: "Recommended based on your interest",
+            poster:
+              movie.poster_path
+                ? `https://image.tmdb.org/t/p/w200${movie.poster_path}`
+                : movie.Poster ||
+                  "https://dummyimage.com/80x120/000/fff&text=No",
+            id: movie.id || movie.imdbID || null,
+          };
+        })
+      );
+
+      return res.json({
+        text: "Here are some good picks 👇",
+        data: enrichedMovies,
+      });
+    }
+
+    // ============================
+    // 🔁 MORE
+    // ============================
+    if (intent === "more") {
+      const finalQuery = meaningfulQuery || message;
+
+      const response = await axios.get(
+        `${BASE_URL}/api/movies?q=${finalQuery}`
+      );
+
+      const results = response.data.data || [];
+
+      const enrichedMovies = results.slice(5, 10).map((movie) => ({
+        title: movie.title || movie.Title,
+        reason: "More like your previous interest",
+        poster:
+          movie.poster_path
+            ? `https://image.tmdb.org/t/p/w200${movie.poster_path}`
+            : movie.Poster ||
+              "https://dummyimage.com/80x120/000/fff&text=No",
+        id: movie.id || movie.imdbID || null,
+      }));
+
+      return res.json({
+        text: "Here are more 👇",
+        data: enrichedMovies,
+      });
+    }
+
+    // ============================
+    // 💬 CHAT (LLM fallback)
+    // ============================
     if (intent === "chat") {
-      const prompt = `
-    You are a friendly movie assistant.
-
-    User: ${message}
-
-    Respond conversationally in 1-2 lines.
-    `;
+      const formattedHistory = history.slice(-10).map((m) => ({
+        role: m.role === "user" ? "user" : "assistant",
+        content: m.text || "",
+      }));
 
       const aiRes = await openai.chat.completions.create({
         model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a smart movie assistant. Keep replies short and helpful.",
+          },
+          ...formattedHistory,
+        ],
       });
 
       const text = aiRes.choices[0].message.content;
@@ -303,98 +379,6 @@ app.post("/api/ai/chat", async (req, res) => {
       });
     }
 
-    if (intent === "recommendation") {
-      const prompt = `
-      You are a strict movie recommendation engine.
-
-      User query: "${message}"
-
-      RULES:
-      - ALWAYS return 5 results
-      - NEVER explain outside JSON
-      - NEVER talk casually
-      - If actor mentioned → return their works
-      - If vague → return popular content
-
-      Return ONLY JSON array:
-
-      [
-        { "title": "Name", "reason": "Short reason" }
-      ]
-      `;
-
-      const aiRes = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-      });
-
-      const text = aiRes.choices[0].message.content;
-
-      let parsed;
-
-      try {
-        parsed = JSON.parse(text);
-      } catch {
-        return res.json({ data: [], text: "Something went wrong." });
-      }
-
-      let movies = [];
-      let responseText = "";
-
-      if (Array.isArray(parsed)) {
-        movies = parsed;
-      } else {
-        responseText = parsed.text || "";
-        movies = parsed.data || [];
-      }
-
-      // 🔥 IMPORTANT: enrich with real data from your API
-      const enrichedMovies = await Promise.all(
-        movies.map(async (movie) => {
-          try {
-            // Step 1: Search by title to get IMDb ID
-            const searchRes = await axios.get(
-              `${BASE_URL}/api/movies?q=${movie.title}`
-            );
-
-            const results = searchRes.data.data;
-
-            // If no results, return original with dummy poster and null ID
-            if (!results || results.length === 0) {
-              return {
-                ...movie,
-                poster: "https://dummyimage.com/80x120/000/fff&text=No",
-                id: null,
-              };
-            }
-
-            // Try to find an exact title match (case-insensitive)
-            const match = results.find(
-              (r) =>
-                (r.Title || "").toLowerCase() === movie.title.toLowerCase()
-            );
-
-            const first = match || results[0];
-            return {
-              ...movie,
-              poster:
-                first.Poster && first.Poster !== "N/A"
-                  ? first.Poster
-                  : "https://dummyimage.com/80x120/000/fff&text=No",
-              id: first.imdbID || null,
-            };
-          } catch (e) {
-            console.log("Enrich error:", movie.title);
-            return movie;
-          }
-        })
-      );
-
-      return res.json({
-        text: "",
-        data: enrichedMovies,
-      });
-    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "AI failed" });
