@@ -37,7 +37,9 @@ const Chat = ({ currentMovie }) => {
     const currentInput = input; // store before clearing
 
     // track search activity (with debounce + trim)
-    trackUserActivity({ search: currentInput });
+    if (currentInput.trim().length > 3) {
+      trackUserActivity({ search: currentInput });
+    }
     setInput(""); // clear immediately (UX fix)
 
     const userMsg = { role: "user", text: currentInput };
@@ -58,7 +60,11 @@ const Chat = ({ currentMovie }) => {
       setMessages((prev) => [...prev, botMsg]);
     } catch (err) {
       console.log(err);
-      setLoading(false); // 🔥 important
+      setMessages((prev) => [
+        ...prev,
+        { role: "bot", text: "Something went wrong. Try again." },
+      ]);
+      setLoading(false); // reset loading state on error
     }
   };
 
