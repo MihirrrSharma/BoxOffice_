@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import OpenAI from "openai";
 import mongoose from "mongoose";
 import UserActivity from "./models/UserActivity.js";
-const detectIntent = require("./utils/intent");
+import { detectIntent } from "./utils/intent.js";
 
 dotenv.config();
 const app = express();
