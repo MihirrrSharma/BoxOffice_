@@ -11,10 +11,17 @@ const app = express();
 
 app.use(
   cors({
-    origin: [
-      "http://localhost:3000",
-      "https://box-office-z18g-xr0j-6al8o2k8p-mihirrrsharmas-projects.vercel.app/"
-    ],
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+
+      // allow localhost
+      if (origin.includes("localhost")) return callback(null, true);
+
+      // allow ALL vercel preview + production domains
+      if (origin.includes(".vercel.app")) return callback(null, true);
+
+      return callback(new Error("Not allowed by CORS"));
+    },
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
