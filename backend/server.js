@@ -16,11 +16,11 @@ app.use(
       "https://box-office-z18g-xr0j-qv88ebu3w-mihirrrsharmas-projects.vercel.app"
     ],
     methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials: true
+    credentials: true,
   })
 );
 
-app.use(cors());
+app.options("*", cors());
 
 app.use(express.json());
 
