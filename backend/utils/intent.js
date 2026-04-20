@@ -11,4 +11,4 @@ const detectIntent = (message) => {
   return "chat";
 };
 
-module.exports = detectIntent;
+export default detectIntent;
