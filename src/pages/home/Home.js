@@ -13,7 +13,17 @@ const Home = () => {
   useEffect(() => {
     const getData = async () => {
       try {
-        const response = await fetchMovies("Mission Impossible"); // fallback for trending movies
+        const seeds = [
+          "avengers",
+          "batman",
+          "harry potter",
+          "inception",
+          "john wick",
+          "spiderman",
+        ];
+
+        const randomSeed = seeds[Math.floor(Math.random() * seeds.length)];
+        const response = await fetchMovies(randomSeed); // fallback for trending movies
 
         const movies =
           response.source === "tmdb"

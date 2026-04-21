@@ -1,7 +1,6 @@
 const detectIntent = (message) => {
   const msg = message.toLowerCase();
 
-  // 🔥 recommendation keywords
   if (
     msg.includes("recommend") ||
     msg.includes("suggest") ||
@@ -31,6 +30,8 @@ const detectIntent = (message) => {
   }
 
   if (["yes", "yeah", "ok"].includes(msg.trim())) return "confirm";
+
+  if (["hi", "hello", "hey"].includes(msg.trim())) return "greeting";
 
   return "chat";
 };

@@ -6,6 +6,8 @@ import OpenAI from "openai";
 import mongoose from "mongoose";
 import UserActivity from "./models/UserActivity.js";
 import detectIntent from "./utils/intent.js";
+import { cleanQuery } from "./utils/cleanQuery.js";
+import { GENRE_SEEDS } from "./utils/genreMap.js";
 
 dotenv.config();
 const app = express();
@@ -255,7 +257,7 @@ app.post("/api/ai/chat", async (req, res) => {
           m.role === "user" &&
           m.text.length > 3 &&
           !["yes", "yeah", "ok", "more"].includes(m.text.toLowerCase())
-      )?.text;
+      )?.text || "";
 
     // ============================
     // 🔥 PERSONALIZATION
@@ -268,15 +270,38 @@ app.post("/api/ai/chat", async (req, res) => {
       const searches = activities.flatMap((a) => a.searches || []);
       const viewed = activities.flatMap((a) => a.viewedMovies || []);
 
-      preferenceSeed = [
-        ...searches.slice(-3),
-        ...viewed.map((m) => m.title).slice(-3),
-      ].join(" ");
+      const cleanPreferences = [
+        ...searches,
+        ...viewed.map((m) => m.title),
+      ]
+        .slice(-5)
+        .map((q) => cleanQuery(q))
+        .filter((q) => q.length > 2);
+
+      preferenceSeed = cleanPreferences.join(" ");
+    }
+
+    // ============================
+    // 🔍 CLEAN USER QUERY
+    // ============================
+    const rawQuery =
+      message.trim().length < 4 ? meaningfulQuery : message;
+
+    const cleanUserQuery = cleanQuery(rawQuery);
+    const cleanPreference = cleanQuery(preferenceSeed);
+
+    let finalQuery;
+
+    if (cleanUserQuery.length > 2) {
+      finalQuery = cleanUserQuery;
+    } else if (cleanPreference.length > 2) {
+      finalQuery = cleanPreference;
+    } else {
+      finalQuery = "popular";
     }
 
     console.log("Intent:", intent);
-    console.log("Context:", meaningfulQuery);
-    console.log("Preference:", preferenceSeed);
+    console.log("Final Query:", finalQuery);
 
     // ============================
     // 👋 GREETING
@@ -292,30 +317,47 @@ app.post("/api/ai/chat", async (req, res) => {
     // 🎯 RECOMMEND / GENRE / CONFIRM
     // ============================
     if (["recommend", "genre", "confirm"].includes(intent)) {
-      const baseQuery = message.trim().length < 4 ? meaningfulQuery : message;
+      let results = [];
 
-      const finalQuery = `${baseQuery} ${preferenceSeed}`.trim();
+      if (GENRE_SEEDS[finalQuery]) {
+        const seeds = GENRE_SEEDS[finalQuery];
 
-      const response = await axios.get(
-        `${BASE_URL}/api/movies?q=${finalQuery}`
-      );
+        const responses = await Promise.all(
+          seeds.map((seed) =>
+            axios.get(`${BASE_URL}/api/movies?q=${seed}`)
+          )
+        );
 
-      const results = response.data.data || [];
+        results = responses.flatMap((r) => r.data.data || []);
+      } else {
+        const response = await axios.get(
+          `${BASE_URL}/api/movies?q=${finalQuery}`
+        );
 
-      const enrichedMovies = await Promise.all(
-        results.slice(0, 5).map(async (movie) => {
-          return {
-            title: movie.title || movie.Title,
-            reason: "Recommended based on your interest",
-            poster:
-              movie.poster_path
-                ? `https://image.tmdb.org/t/p/w200${movie.poster_path}`
-                : movie.Poster ||
-                  "https://dummyimage.com/80x120/000/fff&text=No",
-            id: movie.id || movie.imdbID || null,
-          };
-        })
-      );
+        results = response.data.data || [];
+      }
+
+      // 🔥 ranking improvement
+      const sorted = results.sort((a, b) => {
+        const aTitle = (a.Title || a.title || "").toLowerCase();
+        const bTitle = (b.Title || b.title || "").toLowerCase();
+
+        const aScore = aTitle.includes(finalQuery) ? 1 : 0;
+        const bScore = bTitle.includes(finalQuery) ? 1 : 0;
+
+        return bScore - aScore;
+      });
+
+      const enrichedMovies = sorted.slice(0, 5).map((movie) => ({
+        title: movie.title || movie.Title,
+        reason: "Recommended based on your interest",
+        poster:
+          movie.poster_path
+            ? `https://image.tmdb.org/t/p/w200${movie.poster_path}`
+            : movie.Poster ||
+              "https://dummyimage.com/80x120/000/fff&text=No",
+        id: movie.id || movie.imdbID || null,
+      }));
 
       return res.json({
         text: "Here are some good picks 👇",
@@ -327,8 +369,6 @@ app.post("/api/ai/chat", async (req, res) => {
     // 🔁 MORE
     // ============================
     if (intent === "more") {
-      const finalQuery = meaningfulQuery || message;
-
       const response = await axios.get(
         `${BASE_URL}/api/movies?q=${finalQuery}`
       );
